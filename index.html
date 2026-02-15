@@ -9,9 +9,7 @@ import {
   Loader2,
   Check,
   Zap,
-  Trash2,
   History as HistoryIcon,
-  ChevronDown,
   ChevronUp,
   Maximize2,
   Minimize2,
@@ -19,30 +17,36 @@ import {
   Languages,
   BookOpen,
   Send,
-  ArrowRight
+  ArrowRight,
+  Eraser,
+  CheckCheck,
+  AlignLeft,
+  PenTool
 } from 'lucide-react';
 
 const apiKey = "";
 const MODEL_NAME = "gemini-2.5-flash-preview-09-2025";
 
 const TONES = [
+  { id: 'grammar', label: 'Fix Grammar', icon: <CheckCheck className="w-4 h-4" />, color: 'text-emerald-500', prompt: "Correct the grammar, spelling, and punctuation. Provide 3 versions: 1) Minimal correction, 2) Flow optimized, 3) Sophisticated." },
   { id: 'professional', label: 'Professional', icon: <Briefcase className="w-4 h-4" />, color: 'text-indigo-600', prompt: "Rewrite professionally for a corporate environment." },
   { id: 'casual', label: 'Casual', icon: <Shirt className="w-4 h-4" />, color: 'text-blue-500', prompt: "Rewrite in a relaxed, friendly, and conversational way." },
-  { id: 'academic', label: 'Academic', icon: <BookOpen className="w-4 h-4" />, color: 'text-purple-600', prompt: "Rewrite using formal academic language and sophisticated vocabulary." },
-  { id: 'linkedin', label: 'LinkedIn', icon: <Send className="w-4 h-4" />, color: 'text-sky-700', prompt: "Optimize this for a LinkedIn post with high engagement and professional networking tone." },
-  { id: 'punchy', label: 'Punchy', icon: <Zap className="w-4 h-4" />, color: 'text-orange-500', prompt: "Make it extremely concise, impactful, and direct." },
-  { id: 'friendly', label: 'Friendly', icon: <CheckCircle2 className="w-4 h-4" />, color: 'text-green-500', prompt: "Make it sound warm, welcoming, and empathetic." },
+  { id: 'summarize', label: 'Summarize', icon: <AlignLeft className="w-4 h-4" />, color: 'text-rose-500', prompt: "Summarize this text in 3 different ways: 1) One sentence, 2) Three bullet points, 3) Short paragraph." },
+  { id: 'continue', label: 'Continue', icon: <PenTool className="w-4 h-4" />, color: 'text-amber-500', prompt: "Continue writing based on this context. Provide 3 different directions the text could take." },
+  { id: 'linkedin', label: 'LinkedIn', icon: <Send className="w-4 h-4" />, color: 'text-sky-700', prompt: "Optimize this for a LinkedIn post with networking value." },
+  { id: 'academic', label: 'Academic', icon: <BookOpen className="w-4 h-4" />, color: 'text-purple-600', prompt: "Rewrite using formal academic language." },
+  { id: 'friendly', label: 'Friendly', icon: <CheckCircle2 className="w-4 h-4" />, color: 'text-green-500', prompt: "Make it sound warm and welcoming." },
 ];
 
 const LENGTHS = [
   { id: 'short', label: 'Concise', icon: <Minimize2 className="w-3 h-3" /> },
-  { id: 'medium', label: 'Standard', icon: <Settings2 className="w-3 h-3" /> },
+  { id: 'medium', label: 'Balanced', icon: <Settings2 className="w-3 h-3" /> },
   { id: 'long', label: 'Detailed', icon: <Maximize2 className="w-3 h-3" /> },
 ];
 
 const App = () => {
   const [inputText, setInputText] = useState("");
-  const [selectedTone, setSelectedTone] = useState('professional');
+  const [selectedTone, setSelectedTone] = useState('grammar');
   const [selectedLength, setSelectedLength] = useState('medium');
   const [results, setResults] = useState([]);
   const [history, setHistory] = useState([]);
@@ -51,9 +55,7 @@ const App = () => {
   const [error, setError] = useState(null);
   const [copiedIndex, setCopiedIndex] = useState(null);
 
-  // Stats calculation
   const wordCount = inputText.trim() ? inputText.trim().split(/\s+/).length : 0;
-  const readingTime = Math.ceil(wordCount / 200);
 
   const callGemini = async (prompt) => {
     let delay = 1000;
@@ -84,8 +86,7 @@ const App = () => {
 
         if (!response.ok) throw new Error('API Error');
         const data = await response.json();
-        const parsed = JSON.parse(data.candidates?.[0]?.content?.parts?.[0]?.text);
-        return parsed;
+        return JSON.parse(data.candidates?.[0]?.content?.parts?.[0]?.text);
       } catch (err) {
         if (i === 4) throw err;
         await new Promise(r => setTimeout(r, delay));
@@ -103,10 +104,10 @@ const App = () => {
     const lengthObj = LENGTHS.find(l => l.id === selectedLength);
     
     const prompt = `
-      Task: ${toneObj.prompt}
-      Desired Length: ${lengthObj.label}
-      Text to transform: "${inputText}"
-      Requirement: Provide exactly 3 unique, high-quality variations.
+      Action: ${toneObj.prompt}
+      Desired Result Length: ${lengthObj.label}
+      Input: "${inputText}"
+      Format: Provide 3 distinct variations in a JSON array called "variations".
     `;
 
     try {
@@ -114,7 +115,6 @@ const App = () => {
       const newVariations = data.variations || [];
       setResults(newVariations);
       
-      // Add to history
       const historyItem = {
         original: inputText,
         tone: toneObj.label,
@@ -123,7 +123,7 @@ const App = () => {
       };
       setHistory(prev => [historyItem, ...prev].slice(0, 10));
     } catch (err) {
-      setError("Failed to connect to AI engine. Please try again.");
+      setError("AI service interrupted. Please try again.");
     } finally {
       setIsGenerating(false);
     }
@@ -139,161 +139,176 @@ const App = () => {
       setCopiedIndex(index);
       setTimeout(() => setCopiedIndex(null), 2000);
     } catch (err) {
-      console.error('Failed to copy');
+      console.error('Copy failed');
     }
     document.body.removeChild(textArea);
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] font-sans selection:bg-indigo-100 pb-12">
-      {/* Top Navigation Bar */}
-      <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200 px-4 py-3">
-        <div className="max-w-md mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="bg-[#121826] p-1.5 rounded-lg">
+    <div className="min-h-screen bg-[#FDFDFF] font-sans selection:bg-indigo-100 pb-12">
+      {/* Premium Header */}
+      <nav className="sticky top-0 z-50 bg-white/70 backdrop-blur-xl border-b border-slate-100 px-6 py-4">
+        <div className="max-w-xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="bg-gradient-to-br from-[#121826] to-[#2D364D] p-2 rounded-xl shadow-lg shadow-indigo-100">
               <Wand2 className="w-5 h-5 text-white" />
             </div>
-            <h1 className="text-lg font-bold text-[#121826] tracking-tight">ToneShift Pro</h1>
+            <div>
+              <h1 className="text-xl font-bold text-[#121826] tracking-tight leading-none">ToneShift</h1>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Intelligence Studio</p>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <button 
               onClick={() => setShowHistory(!showHistory)}
-              className={`p-2 rounded-full transition-colors ${showHistory ? 'bg-indigo-50 text-indigo-600' : 'text-slate-400 hover:bg-slate-100'}`}
+              className={`p-2.5 rounded-full transition-all ${showHistory ? 'bg-indigo-600 text-white shadow-indigo-200 shadow-lg' : 'text-slate-400 hover:bg-slate-100'}`}
             >
               <HistoryIcon className="w-5 h-5" />
             </button>
-            <div className="bg-[#FFB11A] px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm border border-orange-200">
-              <Zap className="w-3 h-3 text-white fill-white" />
-              <span className="text-[9px] font-black text-white tracking-widest uppercase">Premium</span>
+            <div className="bg-[#121826] pl-2 pr-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-sm">
+              <div className="bg-[#FFB11A] p-1 rounded-full">
+                <Zap className="w-2.5 h-2.5 text-white fill-white" />
+              </div>
+              <span className="text-[10px] font-black text-white tracking-widest uppercase">Elite</span>
             </div>
           </div>
         </div>
       </nav>
 
-      <main className="max-w-md mx-auto px-4 mt-6">
-        {/* Editor Area */}
-        <div className="bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden transition-all focus-within:ring-2 focus-within:ring-indigo-500/20">
-          <div className="p-6">
-            <div className="flex justify-between items-center mb-4">
-              <div className="flex gap-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                <span>{wordCount} Words</span>
-                <span>{readingTime}m Read</span>
+      <main className="max-w-xl mx-auto px-6 mt-8">
+        {/* Workspace Card */}
+        <div className="bg-white rounded-[2.5rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.05)] border border-slate-100 overflow-hidden transition-all group">
+          <div className="p-8 pb-4">
+            <div className="flex justify-between items-center mb-6">
+              <div className="flex gap-4 items-center">
+                <div className="h-2 w-2 rounded-full bg-indigo-500 animate-pulse" />
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{wordCount} Words</span>
               </div>
               <button 
                 onClick={() => setInputText("")}
-                className="text-[10px] font-bold text-slate-300 hover:text-red-500 transition-colors uppercase tracking-widest"
+                className="group/btn flex items-center gap-1.5 text-[10px] font-bold text-slate-300 hover:text-rose-500 transition-colors uppercase tracking-widest"
               >
-                Clear All
+                <Eraser className="w-3 h-3" />
+                Clear
               </button>
             </div>
             <textarea
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              className="w-full h-40 resize-none border-none focus:ring-0 text-slate-700 text-lg leading-relaxed placeholder:text-slate-300"
-              placeholder="Paste text you want to transform..."
+              className="w-full h-48 resize-none border-none focus:ring-0 text-slate-700 text-xl font-medium leading-relaxed placeholder:text-slate-200 placeholder:font-normal"
+              placeholder="Paste text or start writing..."
             />
           </div>
           
-          {/* Quick Settings Bar */}
-          <div className="bg-slate-50/50 border-t border-slate-100 px-6 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-1">
-               <span className="text-[10px] font-bold text-slate-400 mr-2 uppercase tracking-tighter">Length:</span>
-               <div className="flex bg-slate-200/50 p-1 rounded-lg">
+          <div className="bg-slate-50/50 px-8 py-4 flex items-center justify-between border-t border-slate-50">
+            <div className="flex items-center gap-2">
+               <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Output Strategy</span>
+               <div className="flex bg-white/80 backdrop-blur shadow-sm p-1 rounded-xl border border-slate-100">
                  {LENGTHS.map(l => (
                    <button
                     key={l.id}
                     onClick={() => setSelectedLength(l.id)}
-                    className={`px-2 py-1 rounded-md text-[10px] font-bold transition-all flex items-center gap-1 ${
-                      selectedLength === l.id ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1.5 ${
+                      selectedLength === l.id ? 'bg-[#121826] text-white shadow-md' : 'text-slate-400 hover:text-slate-600'
                     }`}
                    >
-                     {l.icon}
                      {l.label}
                    </button>
                  ))}
                </div>
             </div>
-            <Languages className="w-4 h-4 text-slate-300" />
           </div>
         </div>
 
-        {/* Tone Picker */}
-        <div className="mt-8 mb-4">
-          <div className="flex items-center justify-between mb-3 px-2">
-            <p className="text-slate-500 text-sm font-bold uppercase tracking-wide">Target Tone</p>
-            <span className="text-xs text-indigo-500 font-medium">6 Styles Available</span>
-          </div>
-          <div className="flex overflow-x-auto gap-3 pb-2 no-scrollbar -mx-2 px-2">
+        {/* Improved Tone Carousel */}
+        <div className="mt-10 mb-6">
+          <p className="text-slate-800 text-xs font-black uppercase tracking-widest mb-4 ml-2">Studio Tools</p>
+          <div className="flex overflow-x-auto gap-4 pb-4 no-scrollbar -mx-2 px-2">
             {TONES.map((tone) => (
               <button
                 key={tone.id}
                 onClick={() => setSelectedTone(tone.id)}
-                className={`flex flex-col items-center gap-2 min-w-[90px] p-4 rounded-2xl transition-all border ${
+                className={`flex items-center gap-3 px-6 py-4 rounded-[1.25rem] transition-all border whitespace-nowrap group ${
                   selectedTone === tone.id 
-                  ? 'bg-white border-indigo-500 ring-4 ring-indigo-50 shadow-md' 
-                  : 'bg-white border-slate-100 text-slate-600 hover:border-slate-300'
+                  ? 'bg-white border-indigo-200 shadow-[0_10px_25px_-5px_rgba(99,102,241,0.15)] ring-1 ring-indigo-500/20' 
+                  : 'bg-white border-slate-100 text-slate-500 hover:border-slate-300'
                 }`}
               >
-                <div className={`p-2 rounded-xl ${selectedTone === tone.id ? 'bg-indigo-500 text-white' : 'bg-slate-50 ' + tone.color}`}>
+                <div className={`p-2.5 rounded-xl transition-colors ${selectedTone === tone.id ? 'bg-indigo-600 text-white' : 'bg-slate-50 ' + tone.color}`}>
                   {tone.icon}
                 </div>
-                <span className={`text-[11px] font-bold tracking-tight ${selectedTone === tone.id ? 'text-indigo-600' : 'text-slate-500'}`}>
-                  {tone.label}
-                </span>
+                <div className="text-left">
+                  <span className={`block text-xs font-black tracking-tight ${selectedTone === tone.id ? 'text-indigo-600' : 'text-slate-600'}`}>
+                    {tone.label}
+                  </span>
+                  <span className="block text-[9px] text-slate-400 font-medium">Enhanced</span>
+                </div>
               </button>
             ))}
           </div>
         </div>
 
-        {/* Generate Button */}
+        {/* Generate Magic Button */}
         <button
           onClick={handleRewrite}
           disabled={isGenerating || !inputText.trim()}
-          className="group relative w-full bg-[#121826] text-white py-5 rounded-[1.5rem] font-black text-lg flex items-center justify-center gap-3 overflow-hidden transition-all active:scale-[0.97] hover:bg-[#1e263a] disabled:opacity-40 shadow-2xl shadow-indigo-200"
+          className="relative w-full bg-gradient-to-r from-[#121826] to-[#1E293B] text-white py-6 rounded-[2rem] font-bold text-lg flex items-center justify-center gap-3 overflow-hidden transition-all active:scale-[0.98] hover:shadow-2xl hover:shadow-indigo-200 disabled:opacity-40 group"
         >
           {isGenerating ? (
-            <Loader2 className="w-6 h-6 animate-spin text-indigo-400" />
+            <div className="flex items-center gap-3">
+              <Loader2 className="w-6 h-6 animate-spin text-indigo-400" />
+              <span className="tracking-widest uppercase text-sm font-black animate-pulse">Processing...</span>
+            </div>
           ) : (
             <>
-              <Sparkles className="w-6 h-6 text-indigo-400 group-hover:rotate-12 transition-transform" />
-              Rewrite Magic
-              <ArrowRight className="w-5 h-5 opacity-50" />
+              <Sparkles className="w-6 h-6 text-indigo-400 group-hover:animate-bounce" />
+              <span className="tracking-tight">Transform Content</span>
+              <ArrowRight className="w-5 h-5 opacity-40 group-hover:translate-x-1 transition-transform" />
             </>
           )}
         </button>
 
-        {/* Results Section */}
+        {/* Error Notification */}
+        {error && (
+          <div className="mt-6 bg-rose-50 text-rose-600 p-5 rounded-3xl border border-rose-100 flex items-center gap-3 animate-in fade-in zoom-in">
+            <Zap className="w-5 h-5 text-rose-400" />
+            <span className="text-sm font-bold">{error}</span>
+          </div>
+        )}
+
+        {/* Result Cards */}
         {results.length > 0 && (
-          <div className="mt-10 space-y-5 animate-in fade-in slide-in-from-bottom-6 duration-500">
-            <div className="flex items-center justify-between px-2">
-              <h2 className="text-slate-800 font-black text-xl">Top Suggestions</h2>
-              <div className="h-px flex-1 bg-slate-100 mx-4" />
+          <div className="mt-12 space-y-6 animate-in slide-in-from-bottom-10 duration-700">
+            <div className="flex items-center gap-4 px-2">
+              <h2 className="text-slate-900 font-black text-xl tracking-tighter">Variations</h2>
+              <div className="h-[2px] flex-1 bg-gradient-to-r from-slate-100 to-transparent" />
             </div>
             
             {results.map((result, idx) => (
               <div 
                 key={idx} 
-                className="group bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 hover:border-indigo-200 transition-all hover:shadow-lg hover:shadow-indigo-500/5"
+                className="bg-white p-8 rounded-[2.5rem] shadow-[0_15px_30px_-10px_rgba(0,0,0,0.03)] border border-slate-50 hover:border-indigo-100 transition-all group/card relative"
               >
-                <div className="flex justify-between items-start mb-3">
+                <div className="flex justify-between items-center mb-4">
                    <div className="flex items-center gap-2">
-                     <div className="w-6 h-6 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-[10px] font-black">
-                       {idx + 1}
+                     <div className="w-8 h-8 rounded-xl bg-slate-50 text-slate-400 flex items-center justify-center text-xs font-black group-hover/card:bg-indigo-600 group-hover/card:text-white transition-all">
+                       0{idx + 1}
                      </div>
-                     <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Variation</span>
+                     <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest group-hover/card:text-indigo-400 transition-colors">AI Result</span>
                    </div>
                    <button 
                     onClick={() => copyToClipboard(result, idx)}
-                    className={`p-2.5 rounded-xl transition-all ${
+                    className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all text-xs font-bold ${
                       copiedIndex === idx 
-                      ? 'bg-green-500 text-white' 
-                      : 'bg-slate-50 text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600'
+                      ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-100' 
+                      : 'bg-slate-50 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600'
                     }`}
                   >
                     {copiedIndex === idx ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                    {copiedIndex === idx ? 'Copied' : 'Copy'}
                   </button>
                 </div>
-                <p className="text-slate-700 text-lg leading-relaxed font-medium">
+                <p className="text-slate-700 text-xl leading-relaxed font-medium">
                   {result}
                 </p>
               </div>
@@ -301,63 +316,71 @@ const App = () => {
           </div>
         )}
 
-        {/* History Modal-like Overlay */}
+        {/* History Modal */}
         {showHistory && (
-          <div className="fixed inset-0 z-[60] bg-white overflow-y-auto animate-in slide-in-from-right duration-300 p-6">
-            <div className="flex items-center justify-between mb-8">
-              <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2">
-                <HistoryIcon className="w-6 h-6 text-indigo-500" />
-                Session History
-              </h2>
-              <button 
-                onClick={() => setShowHistory(false)}
-                className="p-2 bg-slate-100 rounded-full text-slate-500"
-              >
-                <ChevronUp className="w-6 h-6" />
-              </button>
+          <div className="fixed inset-0 z-[60] bg-white/95 backdrop-blur-2xl overflow-y-auto animate-in slide-in-from-right duration-500 p-8">
+            <div className="max-w-xl mx-auto">
+              <div className="flex items-center justify-between mb-12">
+                <h2 className="text-3xl font-black text-slate-900 tracking-tighter flex items-center gap-3">
+                  <HistoryIcon className="w-8 h-8 text-indigo-600" />
+                  Journal
+                </h2>
+                <button 
+                  onClick={() => setShowHistory(false)}
+                  className="p-3 bg-[#121826] text-white rounded-full shadow-xl hover:scale-110 transition-transform"
+                >
+                  <ChevronUp className="w-7 h-7" />
+                </button>
+              </div>
+              
+              {history.length === 0 ? (
+                <div className="text-center py-32">
+                  <p className="text-slate-400 font-bold uppercase tracking-widest">No previous transformations</p>
+                </div>
+              ) : (
+                <div className="space-y-10">
+                  {history.map((item, i) => (
+                    <div key={i} className="group border-b border-slate-100 pb-10">
+                      <div className="flex items-center justify-between mb-4">
+                        <span className="text-[10px] font-black bg-slate-900 text-white px-4 py-1.5 rounded-full uppercase tracking-widest">
+                          {item.tone}
+                        </span>
+                        <span className="text-xs font-bold text-slate-400">{item.timestamp}</span>
+                      </div>
+                      <p className="text-sm text-slate-400 font-medium mb-6 line-clamp-2 px-4 border-l-2 border-slate-200">{item.original}</p>
+                      <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm group-hover:shadow-md transition-shadow">
+                        <p className="text-slate-800 font-semibold leading-relaxed">{item.variations[0]}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-            
-            {history.length === 0 ? (
-              <div className="text-center py-20 text-slate-400">
-                <p>No rewrites yet this session.</p>
-              </div>
-            ) : (
-              <div className="space-y-8">
-                {history.map((item, i) => (
-                  <div key={i} className="border-b border-slate-100 pb-8">
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="text-[10px] font-black bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full uppercase tracking-tighter">
-                        {item.tone} Style
-                      </span>
-                      <span className="text-[10px] font-bold text-slate-400">{item.timestamp}</span>
-                    </div>
-                    <p className="text-xs text-slate-400 italic mb-4 line-clamp-1">Original: "{item.original}"</p>
-                    <div className="bg-slate-50 rounded-2xl p-4">
-                      <p className="text-sm text-slate-700 font-semibold">{item.variations[0]}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         )}
 
-        {/* Footer/Empty State */}
+        {/* Empty State Illustration */}
         {!isGenerating && results.length === 0 && (
-          <div className="text-center py-20 opacity-40">
-            <div className="bg-slate-200 w-20 h-20 rounded-[2rem] flex items-center justify-center mx-auto mb-6 transform rotate-12">
-              <Wand2 className="w-10 h-10 text-slate-400" />
+          <div className="text-center py-24 group">
+            <div className="relative w-32 h-32 mx-auto mb-8">
+              <div className="absolute inset-0 bg-indigo-50 rounded-[3rem] rotate-12 group-hover:rotate-0 transition-transform duration-500" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Sparkles className="w-12 h-12 text-indigo-500" />
+              </div>
             </div>
-            <p className="text-slate-500 font-bold">Write something brilliant.</p>
-            <p className="text-slate-400 text-xs mt-1 uppercase tracking-widest">Powered by Gemini Pro</p>
+            <h3 className="text-slate-800 font-black text-xl tracking-tight mb-2">Ready to refine?</h3>
+            <p className="text-slate-400 text-sm font-medium">Select a tool and watch your ideas evolve.</p>
           </div>
         )}
       </main>
 
-      {/* Global CSS for scrollbars */}
       <style dangerouslySetInnerHTML={{ __html: `
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        @keyframes float { 
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-10px); }
+        }
       `}} />
     </div>
   );
