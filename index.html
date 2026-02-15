@@ -1,356 +1,366 @@
-<!DOCTYPE html>
-<html lang="en" class="scroll-smooth dark">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aman | Mobile App Developer</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        border: "hsl(var(--border))",
-                        background: "hsl(var(--background))",
-                        foreground: "hsl(var(--foreground))",
-                    },
-                },
-            },
-        }
-    </script>
-    <style>
-        :root {
-            --background: 0 0% 100%;
-            --foreground: 0 0% 3.9%;
-            --border: 0 0% 89.8%;
-            --grid-color: rgba(0, 0, 0, 0.05);
-        }
-        .dark {
-            --background: 0 0% 3.9%;
-            --foreground: 0 0% 98%;
-            --border: 0 0% 14.9%;
-            --grid-color: rgba(255, 255, 255, 0.05);
-        }
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Wand2, 
+  Sparkles, 
+  Briefcase, 
+  Shirt, 
+  CheckCircle2, 
+  Copy, 
+  Loader2,
+  Check,
+  Zap,
+  Trash2,
+  History as HistoryIcon,
+  ChevronDown,
+  ChevronUp,
+  Maximize2,
+  Minimize2,
+  Settings2,
+  Languages,
+  BookOpen,
+  Send,
+  ArrowRight
+} from 'lucide-react';
 
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: hsl(var(--background));
-            color: hsl(var(--foreground));
-            transition: background-color 0.3s ease, color 0.3s ease;
-        }
+const apiKey = "";
+const MODEL_NAME = "gemini-2.5-flash-preview-09-2025";
 
-        .grid-pattern {
-            background-image: 
-                linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
-                linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
-            background-size: 40px 40px;
-            mask-image: radial-gradient(circle at center, black, transparent 80%);
-        }
+const TONES = [
+  { id: 'professional', label: 'Professional', icon: <Briefcase className="w-4 h-4" />, color: 'text-indigo-600', prompt: "Rewrite professionally for a corporate environment." },
+  { id: 'casual', label: 'Casual', icon: <Shirt className="w-4 h-4" />, color: 'text-blue-500', prompt: "Rewrite in a relaxed, friendly, and conversational way." },
+  { id: 'academic', label: 'Academic', icon: <BookOpen className="w-4 h-4" />, color: 'text-purple-600', prompt: "Rewrite using formal academic language and sophisticated vocabulary." },
+  { id: 'linkedin', label: 'LinkedIn', icon: <Send className="w-4 h-4" />, color: 'text-sky-700', prompt: "Optimize this for a LinkedIn post with high engagement and professional networking tone." },
+  { id: 'punchy', label: 'Punchy', icon: <Zap className="w-4 h-4" />, color: 'text-orange-500', prompt: "Make it extremely concise, impactful, and direct." },
+  { id: 'friendly', label: 'Friendly', icon: <CheckCircle2 className="w-4 h-4" />, color: 'text-green-500', prompt: "Make it sound warm, welcoming, and empathetic." },
+];
 
-        .glass {
-            background: rgba(var(--foreground-rgb), 0.03);
-            backdrop-filter: blur(12px);
-            border: 1px solid var(--grid-color);
-        }
+const LENGTHS = [
+  { id: 'short', label: 'Concise', icon: <Minimize2 className="w-3 h-3" /> },
+  { id: 'medium', label: 'Standard', icon: <Settings2 className="w-3 h-3" /> },
+  { id: 'long', label: 'Detailed', icon: <Maximize2 className="w-3 h-3" /> },
+];
 
-        .text-gradient {
-            background: linear-gradient(to right, hsl(var(--foreground)), #71717a);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
+const App = () => {
+  const [inputText, setInputText] = useState("");
+  const [selectedTone, setSelectedTone] = useState('professional');
+  const [selectedLength, setSelectedLength] = useState('medium');
+  const [results, setResults] = useState([]);
+  const [history, setHistory] = useState([]);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [error, setError] = useState(null);
+  const [copiedIndex, setCopiedIndex] = useState(null);
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+  // Stats calculation
+  const wordCount = inputText.trim() ? inputText.trim().split(/\s+/).length : 0;
+  const readingTime = Math.ceil(wordCount / 200);
 
-        .animate-reveal {
-            animation: fadeIn 0.8s ease-out forwards;
-        }
-
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-        ::-webkit-scrollbar-track { background: hsl(var(--background)); }
-        ::-webkit-scrollbar-thumb {
-            background: var(--grid-color);
-            border-radius: 10px;
-        }
-    </style>
-</head>
-<body class="selection:bg-neutral-500/30">
-
-    <!-- Navigation -->
-    <nav class="fixed top-0 w-full z-50 glass border-b transition-colors duration-300">
-        <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-            <a href="#" class="text-xl font-bold tracking-tighter">aman<span class="opacity-40">.pro.bd</span></a>
-            
-            <div class="hidden md:flex items-center space-x-8 text-sm font-medium opacity-60">
-                <a href="#apps" class="hover:opacity-100 transition-opacity">Apps</a>
-                <a href="#expertise" class="hover:opacity-100 transition-opacity">Expertise</a>
-                <a href="#contact" class="hover:opacity-100 transition-opacity">Contact</a>
-            </div>
-
-            <div class="flex items-center gap-4">
-                <button id="theme-toggle" class="p-2 rounded-full hover:bg-neutral-500/10 transition-colors" aria-label="Toggle Theme">
-                    <i data-lucide="moon" class="w-5 h-5 dark:hidden"></i>
-                    <i data-lucide="sun" class="w-5 h-5 hidden dark:block"></i>
-                </button>
-                <a href="#contact" class="px-4 py-2 bg-foreground text-background text-sm font-semibold rounded-full hover:opacity-90 transition-all">
-                    Hire Me
-                </a>
-            </div>
-        </div>
-    </nav>
-
-    <!-- Hero Section -->
-    <section class="relative pt-48 pb-32 px-6 overflow-hidden min-h-[80vh] flex items-center justify-center">
-        <div class="absolute inset-0 grid-pattern pointer-events-none -z-10"></div>
-        
-        <div class="max-w-4xl mx-auto text-center animate-reveal">
-            <span class="inline-block px-3 py-1 rounded-full bg-neutral-500/5 border border-neutral-500/10 text-xs font-medium opacity-60 mb-6">
-                Specializing in iOS & Android
-            </span>
-            <h1 class="text-5xl md:text-7xl font-bold tracking-tight text-gradient mb-8 leading-tight">
-                Building seamless mobile experiences.
-            </h1>
-            <p class="text-lg md:text-xl opacity-50 mb-10 max-w-2xl mx-auto leading-relaxed">
-                I'm Aman, an App Developer based in Bangladesh. I transform complex ideas into high-performance, native-feel applications that users love.
-            </p>
-            <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
-                <a href="#apps" class="w-full sm:w-auto px-8 py-4 bg-foreground text-background font-semibold rounded-xl hover:scale-105 transition-transform shadow-lg shadow-neutral-500/10">
-                    Explore Apps
-                </a>
-                <a href="https://wa.me/8801755888793" target="_blank" class="w-full sm:w-auto px-8 py-4 glass font-semibold rounded-xl hover:bg-neutral-500/5 transition-colors flex items-center justify-center gap-2">
-                    <i data-lucide="message-circle" class="w-5 h-5"></i> WhatsApp Me
-                </a>
-            </div>
-        </div>
-    </section>
-
-    <!-- Featured Apps -->
-    <section id="apps" class="py-20 px-6">
-        <div class="max-w-6xl mx-auto">
-            <div class="text-center mb-16">
-                <h2 class="text-3xl font-bold mb-2">Selected Apps</h2>
-                <p class="opacity-40 text-sm">Showcasing performance, design, and scalability.</p>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <!-- App 1 -->
-                <div class="group cursor-pointer">
-                    <div class="relative aspect-[4/3] rounded-3xl overflow-hidden glass mb-6 border transition-all duration-500 group-hover:border-neutral-500/30 flex items-center justify-center">
-                        <div class="absolute inset-0 bg-neutral-500/5 transition-transform duration-700 group-hover:scale-105"></div>
-                        <div class="relative w-32 h-64 border-4 border-foreground/10 rounded-[2.5rem] bg-background shadow-2xl overflow-hidden flex items-center justify-center">
-                             <i data-lucide="smartphone" class="w-12 h-12 opacity-20"></i>
-                        </div>
-                    </div>
-                    <div class="flex justify-between items-start px-2">
-                        <div>
-                            <h3 class="text-lg font-semibold mb-1">Fitness Tracker Pro</h3>
-                            <p class="text-sm opacity-40">iOS & Android • Flutter</p>
-                        </div>
-                        <div class="flex gap-2">
-                             <i data-lucide="apple" class="w-4 h-4 opacity-40"></i>
-                             <i data-lucide="play" class="w-4 h-4 opacity-40"></i>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- App 2 -->
-                <div class="group cursor-pointer">
-                    <div class="relative aspect-[4/3] rounded-3xl overflow-hidden glass mb-6 border transition-all duration-500 group-hover:border-neutral-500/30 flex items-center justify-center">
-                        <div class="absolute inset-0 bg-neutral-500/5 transition-transform duration-700 group-hover:scale-105"></div>
-                        <div class="relative w-32 h-64 border-4 border-foreground/10 rounded-[2.5rem] bg-background shadow-2xl overflow-hidden flex items-center justify-center">
-                             <i data-lucide="shopping-bag" class="w-12 h-12 opacity-20"></i>
-                        </div>
-                    </div>
-                    <div class="flex justify-between items-start px-2">
-                        <div>
-                            <h3 class="text-lg font-semibold mb-1">SwiftCommerce</h3>
-                            <p class="text-sm opacity-40">E-commerce App • React Native</p>
-                        </div>
-                        <div class="flex gap-2">
-                             <i data-lucide="smartphone" class="w-4 h-4 opacity-40"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="mt-12 text-center">
-                <a href="#" class="inline-flex items-center gap-2 text-sm font-medium hover:underline opacity-60 hover:opacity-100 transition-opacity">
-                    View All Projects <i data-lucide="arrow-right" class="w-4 h-4"></i>
-                </a>
-            </div>
-        </div>
-    </section>
-
-    <!-- Expertise -->
-    <section id="expertise" class="py-20 px-6 bg-neutral-500/[0.02]">
-        <div class="max-w-6xl mx-auto">
-            <div class="text-center mb-16">
-                <h2 class="text-3xl font-bold mb-4">Core Expertise</h2>
-                <p class="opacity-40 max-w-xl mx-auto text-sm">Specialized skills in building modern mobile applications.</p>
-            </div>
-            
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
-                <div class="p-8 rounded-2xl glass transition-all border group hover:border-foreground/20">
-                    <div class="w-14 h-14 bg-neutral-500/10 rounded-xl flex items-center justify-center mb-6 text-foreground mx-auto group-hover:scale-110 transition-transform">
-                        <i data-lucide="cpu" class="w-7 h-7"></i>
-                    </div>
-                    <h3 class="text-lg font-bold mb-3">Cross-platform Dev</h3>
-                    <p class="text-sm opacity-50 leading-relaxed">Developing high-performance apps for both iOS and Android using Flutter and React Native.</p>
-                </div>
-
-                <div class="p-8 rounded-2xl glass transition-all border group hover:border-foreground/20">
-                    <div class="w-14 h-14 bg-neutral-500/10 rounded-xl flex items-center justify-center mb-6 text-foreground mx-auto group-hover:scale-110 transition-transform">
-                        <i data-lucide="layout" class="w-7 h-7"></i>
-                    </div>
-                    <h3 class="text-lg font-bold mb-3">Mobile UI/UX</h3>
-                    <p class="text-sm opacity-50 leading-relaxed">Designing intuitive interfaces with a focus on smooth micro-interactions and thumb-friendly navigation.</p>
-                </div>
-
-                <div class="p-8 rounded-2xl glass transition-all border group hover:border-foreground/20">
-                    <div class="w-14 h-14 bg-neutral-500/10 rounded-xl flex items-center justify-center mb-6 text-foreground mx-auto group-hover:scale-110 transition-transform">
-                        <i data-lucide="cloud-lightning" class="w-7 h-7"></i>
-                    </div>
-                    <h3 class="text-lg font-bold mb-3">API & Backend</h3>
-                    <p class="text-sm opacity-50 leading-relaxed">Integrating robust REST/GraphQL APIs and real-time cloud services like Firebase for dynamic features.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Contact Section -->
-    <section id="contact" class="py-32 px-6">
-        <div class="max-w-6xl mx-auto">
-            <div class="text-center mb-12">
-                <h2 class="text-2xl font-bold mb-3 tracking-tight">Let's work together.</h2>
-                <p class="opacity-50 text-base max-w-xl mx-auto">Whether you have a fully-fledged app idea or just a concept, I'm here to build it.</p>
-            </div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <!-- Contact Form Card -->
-                <div class="glass rounded-3xl p-6 md:p-10 border relative overflow-hidden h-full">
-                    <div class="absolute -top-24 -left-24 w-64 h-64 bg-neutral-500/10 blur-[100px] rounded-full pointer-events-none"></div>
-                    <h2 class="text-lg font-bold mb-5">Send a Message</h2>
-                    <form id="contactForm" class="grid grid-cols-1 gap-3 relative z-10 text-sm">
-                        <input type="text" placeholder="Name" required class="w-full px-4 py-3 rounded-xl bg-neutral-500/5 border border-neutral-500/10 focus:border-foreground/30 focus:outline-none transition-colors">
-                        <input type="email" placeholder="Email" required class="w-full px-4 py-3 rounded-xl bg-neutral-500/5 border border-neutral-500/10 focus:border-foreground/30 focus:outline-none transition-colors">
-                        <textarea placeholder="Tell me about your project..." rows="3" required class="w-full px-4 py-3 rounded-xl bg-neutral-500/5 border border-neutral-500/10 focus:border-foreground/30 focus:outline-none transition-colors"></textarea>
-                        <button type="submit" class="w-full py-3 bg-foreground text-background font-bold rounded-xl hover:opacity-90 transition-all">
-                            Send Inquiry
-                        </button>
-                    </form>
-                    <div id="contact-success" class="hidden animate-reveal p-6 text-center">
-                        <div class="w-12 h-12 bg-green-500/10 text-green-500 rounded-full flex items-center justify-center mx-auto mb-3">
-                            <i data-lucide="check" class="w-6 h-6"></i>
-                        </div>
-                        <h3 class="text-lg font-bold mb-1">Message Sent!</h3>
-                        <p class="opacity-50 text-sm">I'll get back to you shortly.</p>
-                    </div>
-                </div>
-
-                <!-- Direct Contact Details -->
-                <div class="grid grid-cols-1 gap-3 h-full">
-                    <!-- WhatsApp -->
-                    <a href="https://wa.me/8801755888793" target="_blank" class="group flex items-center gap-5 p-5 rounded-3xl border border-neutral-500/10 bg-neutral-500/5 hover:border-neutral-500/30 hover:bg-neutral-500/10 transition-all">
-                        <div class="w-12 h-12 bg-neutral-500/10 rounded-xl flex flex-shrink-0 items-center justify-center group-hover:scale-105 transition-transform">
-                            <i data-lucide="message-circle" class="w-6 h-6"></i>
-                        </div>
-                        <div class="min-w-0">
-                            <p class="text-[10px] font-bold uppercase tracking-widest opacity-30 mb-0.5">WhatsApp</p>
-                            <p class="text-base font-semibold truncate">+880 1755-888793</p>
-                        </div>
-                    </a>
-
-                    <!-- Email -->
-                    <a href="mailto:info.amanofficial@gmail.com" class="group flex items-center gap-5 p-5 rounded-3xl border border-neutral-500/10 bg-neutral-500/5 hover:border-neutral-500/30 hover:bg-neutral-500/10 transition-all">
-                        <div class="w-12 h-12 bg-neutral-500/10 rounded-xl flex flex-shrink-0 items-center justify-center group-hover:scale-105 transition-transform">
-                            <i data-lucide="mail" class="w-6 h-6"></i>
-                        </div>
-                        <div class="min-w-0">
-                            <p class="text-[10px] font-bold uppercase tracking-widest opacity-30 mb-0.5">Email</p>
-                            <p class="text-base font-semibold truncate">info.amanofficial@gmail.com</p>
-                        </div>
-                    </a>
-
-                    <!-- Facebook -->
-                    <a href="https://www.facebook.com/share/1H7t16mFeq/" target="_blank" class="group flex items-center gap-5 p-5 rounded-3xl border border-neutral-500/10 bg-neutral-500/5 hover:border-neutral-500/30 hover:bg-neutral-500/10 transition-all">
-                        <div class="w-12 h-12 bg-neutral-500/10 rounded-xl flex flex-shrink-0 items-center justify-center group-hover:scale-105 transition-transform">
-                            <i data-lucide="facebook" class="w-6 h-6"></i>
-                        </div>
-                        <div class="min-w-0">
-                            <p class="text-[10px] font-bold uppercase tracking-widest opacity-30 mb-0.5">Facebook</p>
-                            <p class="text-base font-semibold truncate">Aman Ullah Aman</p>
-                        </div>
-                    </a>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Footer -->
-    <footer class="py-12 border-t px-6 text-center">
-        <div class="max-w-6xl mx-auto">
-            <div class="flex flex-wrap justify-center gap-6 mb-8 text-xs opacity-40">
-                <a href="https://www.facebook.com/share/1H7t16mFeq/" target="_blank" class="hover:opacity-100 transition-opacity">Facebook</a>
-                <a href="https://wa.me/8801755888793" target="_blank" class="hover:opacity-100 transition-opacity">WhatsApp</a>
-                <a href="mailto:info.amanofficial@gmail.com" class="hover:opacity-100 transition-opacity">Email</a>
-            </div>
-            <p class="text-[10px] opacity-30 tracking-widest uppercase">© 2024 aman.pro.bd — Build for iOS & Android</p>
-        </div>
-    </footer>
-
-    <script>
-        lucide.createIcons();
-
-        // Theme Toggle
-        const themeToggle = document.getElementById('theme-toggle');
-        const htmlElement = document.documentElement;
-        const savedTheme = localStorage.getItem('theme');
-        if (savedTheme === 'light') htmlElement.classList.remove('dark');
-
-        themeToggle.addEventListener('click', () => {
-            htmlElement.classList.toggle('dark');
-            localStorage.setItem('theme', htmlElement.classList.contains('dark') ? 'dark' : 'light');
-            lucide.createIcons();
-        });
-
-        // Form Submission
-        const contactForm = document.getElementById('contactForm');
-        const successMessage = document.getElementById('contact-success');
-        contactForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const btn = contactForm.querySelector('button');
-            btn.textContent = 'Sending...';
-            btn.disabled = true;
-            setTimeout(() => {
-                contactForm.classList.add('hidden');
-                successMessage.classList.remove('hidden');
-            }, 1500);
-        });
-
-        // Animation Observer
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.classList.add('animate-reveal');
-                    entry.target.classList.remove('opacity-0');
+  const callGemini = async (prompt) => {
+    let delay = 1000;
+    for (let i = 0; i < 5; i++) {
+      try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.8,
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: "OBJECT",
+                properties: {
+                  variations: {
+                    type: "ARRAY",
+                    items: { type: "STRING" },
+                    minItems: 3,
+                    maxItems: 3
+                  }
                 }
-            });
-        }, { threshold: 0.1 });
-
-        document.querySelectorAll('section').forEach(section => {
-            if (!section.classList.contains('pt-48')) {
-                section.classList.add('opacity-0', 'transition-all', 'duration-700');
-                observer.observe(section);
+              }
             }
+          })
         });
-    </script>
-</body>
-</html>
 
+        if (!response.ok) throw new Error('API Error');
+        const data = await response.json();
+        const parsed = JSON.parse(data.candidates?.[0]?.content?.parts?.[0]?.text);
+        return parsed;
+      } catch (err) {
+        if (i === 4) throw err;
+        await new Promise(r => setTimeout(r, delay));
+        delay *= 2;
+      }
+    }
+  };
+
+  const handleRewrite = async () => {
+    if (!inputText.trim()) return;
+    setIsGenerating(true);
+    setError(null);
+    
+    const toneObj = TONES.find(t => t.id === selectedTone);
+    const lengthObj = LENGTHS.find(l => l.id === selectedLength);
+    
+    const prompt = `
+      Task: ${toneObj.prompt}
+      Desired Length: ${lengthObj.label}
+      Text to transform: "${inputText}"
+      Requirement: Provide exactly 3 unique, high-quality variations.
+    `;
+
+    try {
+      const data = await callGemini(prompt);
+      const newVariations = data.variations || [];
+      setResults(newVariations);
+      
+      // Add to history
+      const historyItem = {
+        original: inputText,
+        tone: toneObj.label,
+        variations: newVariations,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      setHistory(prev => [historyItem, ...prev].slice(0, 10));
+    } catch (err) {
+      setError("Failed to connect to AI engine. Please try again.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const copyToClipboard = (text, index) => {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    document.body.appendChild(textArea);
+    textArea.select();
+    try {
+      document.execCommand('copy');
+      setCopiedIndex(index);
+      setTimeout(() => setCopiedIndex(null), 2000);
+    } catch (err) {
+      console.error('Failed to copy');
+    }
+    document.body.removeChild(textArea);
+  };
+
+  return (
+    <div className="min-h-screen bg-[#F8FAFC] font-sans selection:bg-indigo-100 pb-12">
+      {/* Top Navigation Bar */}
+      <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200 px-4 py-3">
+        <div className="max-w-md mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="bg-[#121826] p-1.5 rounded-lg">
+              <Wand2 className="w-5 h-5 text-white" />
+            </div>
+            <h1 className="text-lg font-bold text-[#121826] tracking-tight">ToneShift Pro</h1>
+          </div>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setShowHistory(!showHistory)}
+              className={`p-2 rounded-full transition-colors ${showHistory ? 'bg-indigo-50 text-indigo-600' : 'text-slate-400 hover:bg-slate-100'}`}
+            >
+              <HistoryIcon className="w-5 h-5" />
+            </button>
+            <div className="bg-[#FFB11A] px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm border border-orange-200">
+              <Zap className="w-3 h-3 text-white fill-white" />
+              <span className="text-[9px] font-black text-white tracking-widest uppercase">Premium</span>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      <main className="max-w-md mx-auto px-4 mt-6">
+        {/* Editor Area */}
+        <div className="bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden transition-all focus-within:ring-2 focus-within:ring-indigo-500/20">
+          <div className="p-6">
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex gap-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                <span>{wordCount} Words</span>
+                <span>{readingTime}m Read</span>
+              </div>
+              <button 
+                onClick={() => setInputText("")}
+                className="text-[10px] font-bold text-slate-300 hover:text-red-500 transition-colors uppercase tracking-widest"
+              >
+                Clear All
+              </button>
+            </div>
+            <textarea
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              className="w-full h-40 resize-none border-none focus:ring-0 text-slate-700 text-lg leading-relaxed placeholder:text-slate-300"
+              placeholder="Paste text you want to transform..."
+            />
+          </div>
+          
+          {/* Quick Settings Bar */}
+          <div className="bg-slate-50/50 border-t border-slate-100 px-6 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-1">
+               <span className="text-[10px] font-bold text-slate-400 mr-2 uppercase tracking-tighter">Length:</span>
+               <div className="flex bg-slate-200/50 p-1 rounded-lg">
+                 {LENGTHS.map(l => (
+                   <button
+                    key={l.id}
+                    onClick={() => setSelectedLength(l.id)}
+                    className={`px-2 py-1 rounded-md text-[10px] font-bold transition-all flex items-center gap-1 ${
+                      selectedLength === l.id ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                   >
+                     {l.icon}
+                     {l.label}
+                   </button>
+                 ))}
+               </div>
+            </div>
+            <Languages className="w-4 h-4 text-slate-300" />
+          </div>
+        </div>
+
+        {/* Tone Picker */}
+        <div className="mt-8 mb-4">
+          <div className="flex items-center justify-between mb-3 px-2">
+            <p className="text-slate-500 text-sm font-bold uppercase tracking-wide">Target Tone</p>
+            <span className="text-xs text-indigo-500 font-medium">6 Styles Available</span>
+          </div>
+          <div className="flex overflow-x-auto gap-3 pb-2 no-scrollbar -mx-2 px-2">
+            {TONES.map((tone) => (
+              <button
+                key={tone.id}
+                onClick={() => setSelectedTone(tone.id)}
+                className={`flex flex-col items-center gap-2 min-w-[90px] p-4 rounded-2xl transition-all border ${
+                  selectedTone === tone.id 
+                  ? 'bg-white border-indigo-500 ring-4 ring-indigo-50 shadow-md' 
+                  : 'bg-white border-slate-100 text-slate-600 hover:border-slate-300'
+                }`}
+              >
+                <div className={`p-2 rounded-xl ${selectedTone === tone.id ? 'bg-indigo-500 text-white' : 'bg-slate-50 ' + tone.color}`}>
+                  {tone.icon}
+                </div>
+                <span className={`text-[11px] font-bold tracking-tight ${selectedTone === tone.id ? 'text-indigo-600' : 'text-slate-500'}`}>
+                  {tone.label}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Generate Button */}
+        <button
+          onClick={handleRewrite}
+          disabled={isGenerating || !inputText.trim()}
+          className="group relative w-full bg-[#121826] text-white py-5 rounded-[1.5rem] font-black text-lg flex items-center justify-center gap-3 overflow-hidden transition-all active:scale-[0.97] hover:bg-[#1e263a] disabled:opacity-40 shadow-2xl shadow-indigo-200"
+        >
+          {isGenerating ? (
+            <Loader2 className="w-6 h-6 animate-spin text-indigo-400" />
+          ) : (
+            <>
+              <Sparkles className="w-6 h-6 text-indigo-400 group-hover:rotate-12 transition-transform" />
+              Rewrite Magic
+              <ArrowRight className="w-5 h-5 opacity-50" />
+            </>
+          )}
+        </button>
+
+        {/* Results Section */}
+        {results.length > 0 && (
+          <div className="mt-10 space-y-5 animate-in fade-in slide-in-from-bottom-6 duration-500">
+            <div className="flex items-center justify-between px-2">
+              <h2 className="text-slate-800 font-black text-xl">Top Suggestions</h2>
+              <div className="h-px flex-1 bg-slate-100 mx-4" />
+            </div>
+            
+            {results.map((result, idx) => (
+              <div 
+                key={idx} 
+                className="group bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 hover:border-indigo-200 transition-all hover:shadow-lg hover:shadow-indigo-500/5"
+              >
+                <div className="flex justify-between items-start mb-3">
+                   <div className="flex items-center gap-2">
+                     <div className="w-6 h-6 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-[10px] font-black">
+                       {idx + 1}
+                     </div>
+                     <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Variation</span>
+                   </div>
+                   <button 
+                    onClick={() => copyToClipboard(result, idx)}
+                    className={`p-2.5 rounded-xl transition-all ${
+                      copiedIndex === idx 
+                      ? 'bg-green-500 text-white' 
+                      : 'bg-slate-50 text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600'
+                    }`}
+                  >
+                    {copiedIndex === idx ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="text-slate-700 text-lg leading-relaxed font-medium">
+                  {result}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* History Modal-like Overlay */}
+        {showHistory && (
+          <div className="fixed inset-0 z-[60] bg-white overflow-y-auto animate-in slide-in-from-right duration-300 p-6">
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2">
+                <HistoryIcon className="w-6 h-6 text-indigo-500" />
+                Session History
+              </h2>
+              <button 
+                onClick={() => setShowHistory(false)}
+                className="p-2 bg-slate-100 rounded-full text-slate-500"
+              >
+                <ChevronUp className="w-6 h-6" />
+              </button>
+            </div>
+            
+            {history.length === 0 ? (
+              <div className="text-center py-20 text-slate-400">
+                <p>No rewrites yet this session.</p>
+              </div>
+            ) : (
+              <div className="space-y-8">
+                {history.map((item, i) => (
+                  <div key={i} className="border-b border-slate-100 pb-8">
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="text-[10px] font-black bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full uppercase tracking-tighter">
+                        {item.tone} Style
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-400">{item.timestamp}</span>
+                    </div>
+                    <p className="text-xs text-slate-400 italic mb-4 line-clamp-1">Original: "{item.original}"</p>
+                    <div className="bg-slate-50 rounded-2xl p-4">
+                      <p className="text-sm text-slate-700 font-semibold">{item.variations[0]}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Footer/Empty State */}
+        {!isGenerating && results.length === 0 && (
+          <div className="text-center py-20 opacity-40">
+            <div className="bg-slate-200 w-20 h-20 rounded-[2rem] flex items-center justify-center mx-auto mb-6 transform rotate-12">
+              <Wand2 className="w-10 h-10 text-slate-400" />
+            </div>
+            <p className="text-slate-500 font-bold">Write something brilliant.</p>
+            <p className="text-slate-400 text-xs mt-1 uppercase tracking-widest">Powered by Gemini Pro</p>
+          </div>
+        )}
+      </main>
+
+      {/* Global CSS for scrollbars */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      `}} />
+    </div>
+  );
+};
+
+export default App;
